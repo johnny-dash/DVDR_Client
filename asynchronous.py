@@ -104,7 +104,7 @@ def temperature_humidity(frequence):
         while True:
                 try:
                         [ temp,hum ] = grovepi.dht(dht_sensor_port,1)
-                        client.publish(pub_temp, "_SensorD8@Raspberry Pi No.1: Sensor_value = %d" % temp, 1)
+                        client.publish(pub_temp, "temperature&humidity_SensorD8@Raspberry Pi No.1: Sensor_value = %d" % temp, 1)
                         time.sleep(frequence)
                 
                 except (IOError,TypeError) as e:
