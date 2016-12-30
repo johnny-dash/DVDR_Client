@@ -40,27 +40,15 @@ import time
 import grovepi
 import paho.mqtt.client as mqtt
 import threading
-from multiprocessing import Process, Pool
+import multiprocessing 
+#get device serial number
+from GrovepiSerial import getserial
 
-#get Raspberry pi serial number
-def getserial():
-        #Extract serial from CPUinfo file
-        global cpuserial
-        try:
-                #Read cpu file
-                f = open('/proc/cpuinfo','r')
-                for line in f:
-                        #find out the serial info
-                        if line[0:6] == 'Serial':
-                                cpuserial = line[10:26]
-                f.close()
-        except IOError:
-                cpuserial = "ERROR00000000000"
-        return cpuserial
-
+#Process Pool
+pool = []
 
 # SIG,NC,VCC,GND
-air_sensor = 0                  # Connect the Grove Light Sensor to analog port A0
+air_sensor = 0                  # Connect the Grove Air Sensor to analog port A0
 dht_sensor_port = 8		# Connect the DHt sensor to port 8
 
 
@@ -70,6 +58,7 @@ cpuserial = "0000000000000000"
 #set up serial number
 myserial = getserial()
 #client.publish(pub_register, myserial, 1)
+
 
 #Topic setting
 pub_air = myserial + ':Air_Quality:A0'                          #generate unique topic for air quality sensor
@@ -91,6 +80,7 @@ def air_quality_sensor(frequence):
         while True:
                 try:
                         r = read_value()
+                        print(r)
                         result = air_condition(r)
                         client.publish(pub_air, "Air_qulity_SensorA0@Raspberry Pi No.1: Sensor_value = %d" % r, 1)
                         #client.publish(pub_air, result, 1)
@@ -104,6 +94,7 @@ def temperature_humidity(frequence):
         while True:
                 try:
                         [ temp,hum ] = grovepi.dht(dht_sensor_port,1)
+                        print(temp)
                         client.publish(pub_temp, "temperature&humidity_SensorD8@Raspberry Pi No.1: Sensor_value = %d" % temp, 1)
                         time.sleep(frequence)
                 
@@ -147,10 +138,26 @@ def on_message(client, data, msg):
 
                 #filter 
                 if(sensor == 'air'):
-                        threading.Thread(target = air_quality_sensor, args=(float(frequency),)).start()         #create the thread to run the corresponding sensor function
-      
+                        if(status == 'start'):
+                                thr = multiprocessing.Process(target = air_quality_sensor, args=(float(frequency),))      #create the thread to run the corresponding sensor function
+                                thr.start()
+                                pool.append(("air",thr))
+                        elif(status == 'stop'):
+                                for Key, Value in pool:
+                                        if(Key == "air"):
+                                                Value.terminate()
+                                                pool.remove((Key,Value))
+                        
                 elif(sensor == 'temp'):
-                        threading.Thread(target = temperature_humidity, args=(float(frequency),)).start()                       
+                        if(status == 'start'):
+                                thr = multiprocessing.Process(target = temperature_humidity, args=(float(frequency),))
+                                thr.start()
+                                pool.append(("temp",thr))
+                        elif(status == 'stop'):
+                                for Key, Value in pool:
+                                        if(Key == "temp"):
+                                                Value.terminate()
+                                                pool.remove((Key,Value))
                 else:
                         print('no corresponding task on client')
                 
