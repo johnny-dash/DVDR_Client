@@ -44,6 +44,7 @@ import multiprocessing
 #get device serial number
 from GrovepiSerial import getserial
 
+
 #Process Pool
 pool = []
 
@@ -58,6 +59,7 @@ cpuserial = "0000000000000000"
 #set up serial number
 myserial = getserial()
 #client.publish(pub_register, myserial, 1)
+
 
 
 #Topic setting
@@ -79,6 +81,8 @@ pub_register = 'new device' #publish topic for device configuration
 def air_quality_sensor(frequence):
         while True:
                 try:
+                        client = mqtt.Client()
+                        client.connect(server, 1883, 60)
                         r = read_value()
                         print(r)
                         result = air_condition(r)
@@ -93,6 +97,8 @@ def air_quality_sensor(frequence):
 def temperature_humidity(frequence):
         while True:
                 try:
+                        client = mqtt.Client()
+                        client.connect(server, 1883, 60)
                         [ temp,hum ] = grovepi.dht(dht_sensor_port,1)
                         print(temp)
                         client.publish(pub_temp, "temperature&humidity_SensorD8@Raspberry Pi No.1: Sensor_value = %d" % temp, 1)
@@ -137,7 +143,7 @@ def on_message(client, data, msg):
                 print("sensor:" + sensor + " status:" + status + " frequency:" + frequency + " port:" + port)
 
                 #filter 
-                if(sensor == 'air'):
+                if(sensor == 'air_quality'):
                         if(status == 'start'):
                                 thr = multiprocessing.Process(target = air_quality_sensor, args=(float(frequency),))      #create the thread to run the corresponding sensor function
                                 thr.start()
@@ -148,7 +154,7 @@ def on_message(client, data, msg):
                                                 Value.terminate()
                                                 pool.remove((Key,Value))
                         
-                elif(sensor == 'temp'):
+                elif(sensor == 'temperature_humidity'):
                         if(status == 'start'):
                                 thr = multiprocessing.Process(target = temperature_humidity, args=(float(frequency),))
                                 thr.start()
@@ -172,7 +178,6 @@ client.on_message = on_message
 
 client.connect(server, 1883, 60)
 client.loop_start()
-
 
 while True:
         time.sleep(0.5)

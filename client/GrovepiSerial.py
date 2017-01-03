@@ -1,3 +1,7 @@
+import sys
+
+sys.dont_write_bytecode = True
+
 #get Raspberry pi serial number
 def getserial():
         #Extract serial from CPUinfo file
