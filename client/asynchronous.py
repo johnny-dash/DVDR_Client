@@ -49,8 +49,8 @@ from GrovepiSerial import getserial
 pool = []
 
 # SIG,NC,VCC,GND
-air_sensor = 0                  # Connect the Grove Air Sensor to analog port A0
-dht_sensor_port = 8		# Connect the DHt sensor to port 8
+#air_sensor = 0                  # Connect the Grove Air Sensor to analog port A0
+#dht_sensor_port = 8		# Connect the DHt sensor to port 8
 
 
 #Device Serial Number
@@ -58,8 +58,6 @@ cpuserial = "0000000000000000"
 
 #set up serial number
 myserial = getserial()
-#client.publish(pub_register, myserial, 1)
-
 
 
 #Topic setting
@@ -71,49 +69,44 @@ pub_temp = myserial + ':temperature&humidity:D8'                #generate unique
 server = '130.56.250.107'
 
 
-#grovepi configuration
-grovepi.pinMode(air_sensor,"INPUT")
+
 
 sub_topic = '#' #subscribe all topics
 pub_register = 'new device' #publish topic for device configuration
 
 
-def air_quality_sensor(frequence):
+def air_quality_sensor(frequence,port):
         while True:
                 try:
+                        #format port
+                        air_sensor = int(port[1])
+                        #grovepi configuration
+                        #grovepi.pinMode(air_sensor,"INPUT")
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
-                        r = read_value()
-                        print(r)
+                        r = grovepi.analogRead(air_sensor)
                         result = air_condition(r)
                         client.publish(pub_air, "Air_qulity_SensorA0@Raspberry Pi No.1: Sensor_value = %d" % r, 1)
-                        #client.publish(pub_air, result, 1)
-                        #print("time.sleep = " + str(frequence))
                         time.sleep(frequence)
 
                 except IOError:
                         print ("Error") 
 
-def temperature_humidity(frequence):
+def temperature_humidity(frequence,port):
         while True:
                 try:
+                        #format port
+                        dht_sensor_port = int(port[1])
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
+                        #sensor config and value read
                         [ temp,hum ] = grovepi.dht(dht_sensor_port,1)
-                        print(temp)
                         client.publish(pub_temp, "temperature&humidity_SensorD8@Raspberry Pi No.1: Sensor_value = %d" % temp, 1)
                         time.sleep(frequence)
                 
                 except (IOError,TypeError) as e:
                         print("Error")
 
-
-def read_value():
-        # Get sensor value
-        sensor_value = grovepi.analogRead(air_sensor)
-        
-        #print("sensor_value =", sensor_value)
-	return sensor_value
 
 def air_condition(sensor_value):
         if sensor_value > 700:
@@ -145,25 +138,60 @@ def on_message(client, data, msg):
                 #filter 
                 if(sensor == 'air_quality'):
                         if(status == 'start'):
-                                thr = multiprocessing.Process(target = air_quality_sensor, args=(float(frequency),))      #create the thread to run the corresponding sensor function
+                                #start the corresponding function as process
+                                thr = multiprocessing.Process(target = air_quality_sensor, args=(float(frequency),port,))      #create the thread to run the corresponding sensor function
                                 thr.start()
+                                #append the process into process pool
                                 pool.append(("air",thr))
                         elif(status == 'stop'):
+                                #iterate to find exsisted process
                                 for Key, Value in pool:
                                         if(Key == "air"):
+                                                #kill the process and remove from pool
                                                 Value.terminate()
                                                 pool.remove((Key,Value))
-                        
+                        elif(status == 'update'):
+                                #iterate to find exsisted process
+                                for Key, Value in pool:
+                                        if(Key == "air"):
+                                                #kill the process and remove from pool
+                                                Value.terminate()
+                                                pool.remove((Key,Value))
+                                
+                                                                #start the corresponding function as process
+                                thr = multiprocessing.Process(target = air_quality_sensor, args=(float(frequency),port,))      #create the thread to run the corresponding sensor function
+                                thr.start()
+                                #append the process into process pool
+                                pool.append(("air",thr))
+                                
                 elif(sensor == 'temperature_humidity'):
                         if(status == 'start'):
-                                thr = multiprocessing.Process(target = temperature_humidity, args=(float(frequency),))
+                                #start the corresponding function as process
+                                thr = multiprocessing.Process(target = temperature_humidity, args=(float(frequency),port,))
                                 thr.start()
+                                #append the process into process pool
                                 pool.append(("temp",thr))
                         elif(status == 'stop'):
+                                #iterate to find exsisted process
                                 for Key, Value in pool:
                                         if(Key == "temp"):
+                                                #kill the process and remove from pool
                                                 Value.terminate()
                                                 pool.remove((Key,Value))
+                        elif(status == 'update'):
+                                #iterate to find exsisted process
+                                for Key, Value in pool:
+                                        if(Key == "temp"):
+                                                #kill the process and remove from pool
+                                                Value.terminate()
+                                                pool.remove((Key,Value))
+                                
+                                #start the corresponding function as process
+                                thr = multiprocessing.Process(target = temperature_humidity, args=(float(frequency),port,))      #create the thread to run the corresponding sensor function
+                                thr.start()
+                                #append the process into process pool
+                                pool.append(("temp",thr))
+                        
                 else:
                         print('no corresponding task on client')
                 
@@ -178,6 +206,7 @@ client.on_message = on_message
 
 client.connect(server, 1883, 60)
 client.loop_start()
+client.publish('Greeting from new Raspberry Pi',  myserial, 1)
 
 while True:
         time.sleep(0.5)
