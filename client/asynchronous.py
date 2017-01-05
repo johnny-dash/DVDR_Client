@@ -40,9 +40,12 @@ import time
 import grovepi
 import paho.mqtt.client as mqtt
 import threading
-import multiprocessing 
+import multiprocessing
+import xml.etree.ElementTree
+
 #get device serial number
 from GrovepiSerial import getserial
+
 
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -56,6 +59,8 @@ pool = []
 #air_sensor = 0                  # Connect the Grove Air Sensor to analog port A0
 #dht_sensor_port = 8		 # Connect the DHt sensor to port 8
 
+#the flag that if the device has been registered
+register_flag = False
 
 #Device Serial Number
 cpuserial = "0000000000000000"
@@ -177,34 +182,40 @@ def on_connect(client, data, flags, rc):
 	#subscribe message from sensor
 	client.subscribe(sub_topic, 1)
 
-def on_message(client, data, msg):	
-        if msg.topic == 'task':
-                global frequence
-                #phrase the message for task(may become a independent function)
-                info = str(msg.payload).split(':')
-                sensor = info[0];
-                status = info[1];
-                frequency = info[2];
-                port = info[3]
-                
-                #check the output
-                print("sensor:" + sensor + " status:" + status + " frequency:" + frequency + " port:" + port)
+def on_message(client, data, msg):
+        device = str(msg.topic).split(':')[0]
+        if device == myserial:
+                topic = str(msg.topic).split(':')[1]
+                if topic == 'task':
+                        global frequence
+                        #phrase the message for task(may become a independent function)
+                        info = str(msg.payload).split(':')
+                        sensor = info[0];
+                        status = info[1];
+                        frequency = info[2];
+                        port = info[3]
+                        
+                        #check the output
+                        print("sensor:" + sensor + " status:" + status + " frequency:" + frequency + " port:" + port)
 
-                #filter 
-                if(sensor == 'air_quality'):
-                        tskAction(air_quality_sensor, status, 'air', frequency, port)
-                                                                
-                elif(sensor == 'temperature_humidity'):
-                        tskAction(temperature_humidity_sensor, status, 'temp', frequency, port)
-                        
-                elif(sensor == 'light'):
-                        tskAction(light_sensor, status, 'light', frequency, port)
-                        
+                        #filter 
+                        if(sensor == 'air_quality'):
+                                tskAction(air_quality_sensor, status, 'air', frequency, port)
+                                                                        
+                        elif(sensor == 'temperature_humidity'):
+                                tskAction(temperature_humidity_sensor, status, 'temp', frequency, port)
+                                
+                        elif(sensor == 'light'):
+                                tskAction(light_sensor, status, 'light', frequency, port)
+                                
+                        else:
+                                print('no corresponding task on client')
+                       
                 else:
-                        print('no corresponding task on client')
-                
-        else:
-                print("Receive message '" + str(msg.payload) + "' on topic '" + msg.topic + "' with QoS " + str(msg.qos))
+                        print("Receive message '" + str(msg.payload) + "' on topic '" + msg.topic + "' with QoS " + str(msg.qos))
+
+
+
 
 
 
@@ -214,9 +225,12 @@ client.on_message = on_message
 
 client.connect(server, 1883, 60)
 client.loop_start()
-client.publish('Greeting from new Raspberry Pi',  myserial, 1)
-
+client.publish('Greeting from new Raspberry Pi',  myserial,1)
 
 #-----------------------------------------    Main loop         -----------------------------------------------
 while True:
-        time.sleep(0.5)
+        try:                
+                time.sleep(10)
+                client.publish('Greeting from new Raspberry Pi',  myserial,1)
+        except (IOError, TypeError) as e:
+                print("Error")
