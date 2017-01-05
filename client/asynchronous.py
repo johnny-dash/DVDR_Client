@@ -45,12 +45,16 @@ import multiprocessing
 from GrovepiSerial import getserial
 
 
+#----------------------------------------------------------------------------------------------------------------------
+#---------------------------------------          Inital Configuration                     ----------------------------
+#----------------------------------------------------------------------------------------------------------------------
+
 #Process Pool
 pool = []
 
 # SIG,NC,VCC,GND
 #air_sensor = 0                  # Connect the Grove Air Sensor to analog port A0
-#dht_sensor_port = 8		# Connect the DHt sensor to port 8
+#dht_sensor_port = 8		 # Connect the DHt sensor to port 8
 
 
 #Device Serial Number
@@ -69,11 +73,13 @@ pub_temp = myserial + ':temperature&humidity:D8'                #generate unique
 server = '130.56.250.107'
 
 
-
-
 sub_topic = '#' #subscribe all topics
 pub_register = 'new device' #publish topic for device configuration
 
+
+#----------------------------------------------------------------------------------------------------------------------
+#---------------------------------------          Sensor function                     ---------------------------------
+#----------------------------------------------------------------------------------------------------------------------
 
 def air_quality_sensor(frequence,port):
         while True:
@@ -85,14 +91,13 @@ def air_quality_sensor(frequence,port):
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
                         r = grovepi.analogRead(air_sensor)
-                        result = air_condition(r)
                         client.publish(pub_air, "Air_qulity_SensorA0@Raspberry Pi No.1: Sensor_value = %d" % r, 1)
                         time.sleep(frequence)
 
                 except IOError:
                         print ("Error") 
 
-def temperature_humidity(frequence,port):
+def temperature_humidity_sensor(frequence,port):
         while True:
                 try:
                         #format port
@@ -107,17 +112,67 @@ def temperature_humidity(frequence,port):
                 except (IOError,TypeError) as e:
                         print("Error")
 
+def light_sensor(frequence, port):
+        while True:
+                try:
+                        #format port
+                        light_sensor = int(port[1])
+                        client = mqtt.Client()
+                        client.connect(server, 1883, 60)
+                        sensor_value = grovepi.analogRead(light_sensor)
+                        client.publish(pub_temp,"Air_qulity_SensorA0@Raspberry Pi No.1: Sensor_value = %d" % sensor_value, 1)
+                        time.sleep(frequence)
 
-def air_condition(sensor_value):
-        if sensor_value > 700:
-            return "High pollution"
-        elif sensor_value > 300:
-            return "Low pollution"
-        else:
-            return "Air fresh"
+                except (IOError, TypeError) as e:
+                        print("Error")
+                        
 
+#----------------------------------------------------------------------------------------------------------------------
+#---------------------------------------          Process Manager                     ---------------------------------
+#----------------------------------------------------------------------------------------------------------------------
+def createtsk(target, name, tsk_freq, tsk_port):
+        #start the corresponding function as process
+        thr = multiprocessing.Process(target = target, args=(float(tsk_freq),tsk_port,))      #create the thread to run the corresponding sensor function
+        thr.start()
+        #append the process into process pool
+        pool.append((name,thr))
+
+def stoptsk(name):
+        #iterate to find exsisted process
+        for Key, Value in pool:
+                if(Key == name):
+                        #kill the process and remove from pool
+                        Value.terminate()
+                        pool.remove((Key,Value))
+
+def updatetsk(target, name, tsk_freq, tsk_port):
+        #iterate to find exsisted process
+        for Key, Value in pool:
+                if(Key == name):
+                        #kill the process and remove from pool
+                        Value.terminate()
+                        pool.remove((Key,Value))
+                                
+        #start the corresponding function as process
+        thr = multiprocessing.Process(target = target, args=(float(tsk_freq),tsk_port,))      #create the thread to run the corresponding sensor function
+        thr.start()
+        #append the process into process pool
+        pool.append((name,thr))
+
+def tskAction(function, action, tsk_tag, set_fre, set_port ):
+        if(action == 'start'):
+                createtsk(function,tsk_tag,set_fre , set_port)
+        elif(action == 'stop'):
+                stoptsk(tsk_tag)
+        elif(action == 'update'):
+                updatetsk(function,tsk_tag, set_fre, set_port)
+        
+
+#----------------------------------------------------------------------------------------------------------------------
+#---------------------------------------               MQTT                     ---------------------------------------
+#----------------------------------------------------------------------------------------------------------------------
 def on_connect(client, data, flags, rc):
-	print 'Connect with the result code ' + str(rc)                                 #return connection status
+	print 'Connect with the result code ' + str(rc)         #return connection status
         
 	#subscribe message from sensor
 	client.subscribe(sub_topic, 1)
@@ -137,60 +192,13 @@ def on_message(client, data, msg):
 
                 #filter 
                 if(sensor == 'air_quality'):
-                        if(status == 'start'):
-                                #start the corresponding function as process
-                                thr = multiprocessing.Process(target = air_quality_sensor, args=(float(frequency),port,))      #create the thread to run the corresponding sensor function
-                                thr.start()
-                                #append the process into process pool
-                                pool.append(("air",thr))
-                        elif(status == 'stop'):
-                                #iterate to find exsisted process
-                                for Key, Value in pool:
-                                        if(Key == "air"):
-                                                #kill the process and remove from pool
-                                                Value.terminate()
-                                                pool.remove((Key,Value))
-                        elif(status == 'update'):
-                                #iterate to find exsisted process
-                                for Key, Value in pool:
-                                        if(Key == "air"):
-                                                #kill the process and remove from pool
-                                                Value.terminate()
-                                                pool.remove((Key,Value))
-                                
-                                                                #start the corresponding function as process
-                                thr = multiprocessing.Process(target = air_quality_sensor, args=(float(frequency),port,))      #create the thread to run the corresponding sensor function
-                                thr.start()
-                                #append the process into process pool
-                                pool.append(("air",thr))
-                                
+                        tskAction(air_quality_sensor, status, 'air', frequency, port)
+                                                                
                 elif(sensor == 'temperature_humidity'):
-                        if(status == 'start'):
-                                #start the corresponding function as process
-                                thr = multiprocessing.Process(target = temperature_humidity, args=(float(frequency),port,))
-                                thr.start()
-                                #append the process into process pool
-                                pool.append(("temp",thr))
-                        elif(status == 'stop'):
-                                #iterate to find exsisted process
-                                for Key, Value in pool:
-                                        if(Key == "temp"):
-                                                #kill the process and remove from pool
-                                                Value.terminate()
-                                                pool.remove((Key,Value))
-                        elif(status == 'update'):
-                                #iterate to find exsisted process
-                                for Key, Value in pool:
-                                        if(Key == "temp"):
-                                                #kill the process and remove from pool
-                                                Value.terminate()
-                                                pool.remove((Key,Value))
-                                
-                                #start the corresponding function as process
-                                thr = multiprocessing.Process(target = temperature_humidity, args=(float(frequency),port,))      #create the thread to run the corresponding sensor function
-                                thr.start()
-                                #append the process into process pool
-                                pool.append(("temp",thr))
+                        tskAction(temperature_humidity_sensor, status, 'temp', frequency, port)
+                        
+                elif(sensor == 'light'):
+                        tskAction(light_sensor, status, 'light', frequency, port)
                         
                 else:
                         print('no corresponding task on client')
@@ -208,5 +216,7 @@ client.connect(server, 1883, 60)
 client.loop_start()
 client.publish('Greeting from new Raspberry Pi',  myserial, 1)
 
+
+#-----------------------------------------    Main loop         -----------------------------------------------
 while True:
         time.sleep(0.5)
