@@ -68,7 +68,13 @@ cpuserial = "0000000000000000"
 #set up serial number
 myserial = getserial()
 
-
+#inital xml configuration file
+try:
+        et = xml.etree.ElementTree.parse('config.xml')
+        root = et.getroot()
+except ImportError:
+        print("Import Error")
+        
 #Topic setting
 pub_air = myserial + ':Air_Quality:A0'                          #generate unique topic for air quality sensor
 pub_temp = myserial + ':temperature&humidity:D8'                #generate unique topic for temperature&humidity sensor
@@ -226,6 +232,16 @@ client.on_message = on_message
 client.connect(server, 1883, 60)
 client.loop_start()
 client.publish('Greeting from new Raspberry Pi',  myserial,1)
+
+#test xml modified function
+#new_tag = xml.etree.ElementTree.SubElement(et.getroot(), 'a')
+#new_tag.text = 'body text'
+print(root.tag)
+print(root.attrib)
+
+#write the xml
+#et.write('config.xml')
+
 
 #-----------------------------------------    Main loop         -----------------------------------------------
 while True:
