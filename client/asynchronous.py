@@ -41,7 +41,7 @@ import grovepi
 import paho.mqtt.client as mqtt
 import threading
 import multiprocessing
-import xml.etree.ElementTree
+import xml.etree.ElementTree as ET
 
 #get device serial number
 from GrovepiSerial import getserial
@@ -59,8 +59,6 @@ pool = []
 #air_sensor = 0                  # Connect the Grove Air Sensor to analog port A0
 #dht_sensor_port = 8		 # Connect the DHt sensor to port 8
 
-#the flag that if the device has been registered
-register_flag = False
 
 #Device Serial Number
 cpuserial = "0000000000000000"
@@ -69,9 +67,16 @@ cpuserial = "0000000000000000"
 myserial = getserial()
 
 #inital xml configuration file
+global root
+global task
+global et
 try:
-        et = xml.etree.ElementTree.parse('config.xml')
+        et = ET.parse('config.xml')
         root = et.getroot()
+        task = root.find('task')
+
+        #the flag that if the device has been registered
+        register_flag = root.find('register_flag').text
 except ImportError:
         print("Import Error")
         
@@ -170,15 +175,51 @@ def updatetsk(target, name, tsk_freq, tsk_port):
         #append the process into process pool
         pool.append((name,thr))
 
-def tskAction(function, action, tsk_tag, set_fre, set_port ):
+#action filter to take different actions
+def tskAction(function, action, tsk_tag, set_sensor, set_fre, set_port, set_enroll, set_tskname ):
         if(action == 'start'):
+                #create thread
                 createtsk(function,tsk_tag,set_fre , set_port)
+                #add task into xml file
+                Add_new_tsk(set_tskname, set_sensor, action, set_fre, set_port, set_enroll)
         elif(action == 'stop'):
+                #delete the thread
                 stoptsk(tsk_tag)
-        elif(action == 'update'):
-                updatetsk(function,tsk_tag, set_fre, set_port)
-        
 
+        elif(action == 'delete'):
+                #delete the thread and delete task info in xml
+                stoptsk(tsk_tag)
+                Remove_tsk(set_tskname)
+                
+        elif(action == 'update'):
+                #update the thread and update the xml config file
+                updatetsk(function,tsk_tag, set_fre, set_port)
+                Remove_tsk(set_tskname)
+                Add_new_tsk(set_tskname, set_sensor, action, set_fre, set_port, set_enroll)
+                
+#----------------------------------------------------------------------------------------------------------------------
+#---------------------------------------               XML                      ---------------------------------------
+#----------------------------------------------------------------------------------------------------------------------
+def Add_new_tsk(tsk_name, sensor, status, frequency, port, enrollment):
+        tsk = ET.SubElement(task, tsk_name)      
+        tsk_sensor = ET.SubElement(tsk, "sensor")
+        tsk_sensor.text = sensor
+        tsk_status = ET.SubElement(tsk, "status")
+        tsk_status.text = status
+        tsk_frequence = ET.SubElement(tsk, "frequency")
+        tsk_frequence.text = frequency
+        tsk_port = ET.SubElement(tsk, "port")
+        tsk_port.text = port
+        tsk_enrollment = ET.SubElement(tsk, "enrollment")
+        tsk_enrollment.text = enrollment
+        ET.dump(task)
+        et.write('config.xml')
+
+def Remove_tsk(tsk_name):
+        rm_tsk = task.find(tsk_name)
+        task.remove(rm_tsk)
+        et.write('config.xml')
+        
 #----------------------------------------------------------------------------------------------------------------------
 #---------------------------------------               MQTT                     ---------------------------------------
 #----------------------------------------------------------------------------------------------------------------------
@@ -200,30 +241,43 @@ def on_message(client, data, msg):
                         status = info[1];
                         frequency = info[2];
                         port = info[3]
+                        enrollment = info[4]
+                        tsk_name = info[5]
                         
                         #check the output
-                        print("sensor:" + sensor + " status:" + status + " frequency:" + frequency + " port:" + port)
+                        print("sensor:" + sensor + " status:" + status + " frequency:" + frequency + " port:" + port + " enrollment:" + enrollment + " tsk name:" + tsk_name)
 
                         #filter 
                         if(sensor == 'air_quality'):
-                                tskAction(air_quality_sensor, status, 'air', frequency, port)
+                                tskAction(air_quality_sensor, status, 'air', sensor, frequency, port, enrollment, tsk_name)                                
                                                                         
                         elif(sensor == 'temperature_humidity'):
-                                tskAction(temperature_humidity_sensor, status, 'temp', frequency, port)
-                                
+                                tskAction(temperature_humidity_sensor, status, 'temp', sensor, frequency, port, enrollment, tsk_name)
+                                                                
                         elif(sensor == 'light'):
-                                tskAction(light_sensor, status, 'light', frequency, port)
-                                
+                                tskAction(light_sensor, status, 'light', sensor, frequency, port, enrollment, tsk_name)
+                                                               
                         else:
                                 print('no corresponding task on client')
+                elif topic == 'device':
+                        global register_flag
+                        if str(msg.payload) == "record":
+                                print("device has been detected")
+                                register_flag = True
+                                root.find('register_flag').text = "True"
+                        elif str(msg.payload) == "unregistered":
+                                print("device has been unregistered")
+                                register_flag = False
+                                root.find('register_flag').text = "False"
+                        else:
+                                print('device config fail')         
                        
                 else:
                         print("Receive message '" + str(msg.payload) + "' on topic '" + msg.topic + "' with QoS " + str(msg.qos))
 
 
 
-
-
+ 
 
 client = mqtt.Client()
 client.on_connect = on_connect
@@ -233,20 +287,16 @@ client.connect(server, 1883, 60)
 client.loop_start()
 client.publish('Greeting from new Raspberry Pi',  myserial,1)
 
-#test xml modified function
-#new_tag = xml.etree.ElementTree.SubElement(et.getroot(), 'a')
-#new_tag.text = 'body text'
-print(root.tag)
-print(root.attrib)
-
-#write the xml
-#et.write('config.xml')
+#Add_new_tsk("test","1","2","3","4","5")
 
 
 #-----------------------------------------    Main loop         -----------------------------------------------
 while True:
-        try:                
+        try:
+                et.write('config.xml')
                 time.sleep(10)
-                client.publish('Greeting from new Raspberry Pi',  myserial,1)
+                
+                if(register_flag == False):
+                        client.publish('Greeting from new Raspberry Pi',  myserial,1)
         except (IOError, TypeError) as e:
                 print("Error")
