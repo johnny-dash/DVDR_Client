@@ -83,7 +83,7 @@ except ImportError:
 #Topic setting
 pub_air = myserial + ':Air_Quality:A0'                          #generate unique topic for air quality sensor
 pub_temp = myserial + ':temperature&humidity:D8'                #generate unique topic for temperature&humidity sensor
-
+pub_light = myserial + ':light:A1'
 
 #MQTT Server address
 server = '130.56.250.107'
@@ -136,7 +136,7 @@ def light_sensor(frequence, port):
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
                         sensor_value = grovepi.analogRead(light_sensor)
-                        client.publish(pub_temp,"light_SensorA0@ %s : Sensor_value = %d" % (myserial, sensor_value), 1)
+                        client.publish(pub_light,"light_SensorA0@ %s : Sensor_value = %d" % (myserial, sensor_value), 1)
                         time.sleep(frequence)
 
                 except (IOError, TypeError) as e:
