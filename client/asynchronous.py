@@ -68,27 +68,27 @@ myserial = getserial()
 
 #inital xml configuration file
 global root
-global task
+global tasklist
 global et
 try:
+        #read the configration file
         et = ET.parse('config.xml')
+        #set up root for device config info
         root = et.getroot()
-        task = root.find('task')
-
+        #set up task element for task info
+        tasklist = root.find('tasklist')
+        
         #the flag that if the device has been registered
         register_flag = root.find('register_flag').text
 except ImportError:
         print("Import Error")
         
-#Topic setting
-pub_air = myserial + ':Air_Quality:A0'                          #generate unique topic for air quality sensor
-pub_temp = myserial + ':temperature&humidity:D8'                #generate unique topic for temperature&humidity sensor
-pub_light = myserial + ':light:A1'
+
 
 #MQTT Server address
 server = '130.56.250.107'
 
-
+#subscribe topic
 sub_topic = '#' #subscribe all topics
 pub_register = 'new device' #publish topic for device configuration
 
@@ -103,10 +103,11 @@ def air_quality_sensor(frequence,port):
                         #format port
                         air_sensor = int(port[1])
                         #grovepi configuration
-                        #grovepi.pinMode(air_sensor,"INPUT")
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
                         r = grovepi.analogRead(air_sensor)
+                        #generate unique topic for air quality sensor
+                        pub_air = myserial + ':Air_Quality' + port                          
                         client.publish(pub_air, "Air_qulity_SensorA0@ %s : Sensor_value = %d" % (myserial, r), 1)
                         time.sleep(frequence)
 
@@ -122,6 +123,9 @@ def temperature_humidity_sensor(frequence,port):
                         client.connect(server, 1883, 60)
                         #sensor config and value read
                         [ temp,hum ] = grovepi.dht(dht_sensor_port,1)
+                        #setup topic for temperature&humidity sensor
+                        pub_temp = myserial + ':temperature&humidity:' + port
+                        #public the message
                         client.publish(pub_temp, "temperature&humidity_SensorD8@ %s: Sensor_value = %d" % (myserial, temp), 1)
                         time.sleep(frequence)
                 
@@ -136,6 +140,9 @@ def light_sensor(frequence, port):
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
                         sensor_value = grovepi.analogRead(light_sensor)
+                        #setup the topic
+                        pub_light = myserial + ':light:' + port
+                        #public message
                         client.publish(pub_light,"light_SensorA0@ %s : Sensor_value = %d" % (myserial, sensor_value), 1)
                         time.sleep(frequence)
 
@@ -201,12 +208,28 @@ def tskAction(function, action, tsk_tag, set_sensor, set_fre, set_port, set_enro
                 updatetsk(function,tsk_tag, set_fre, set_port)
                 Remove_tsk(set_tskname)
                 Add_new_tsk(set_tskname, set_sensor, action, set_fre, set_port, set_enroll)
+
+#filter different sensor
+def whichTask(sensor, status, frequency, port, enrollment, tsk_name):
+        if(sensor == 'air_quality'):
+                tskAction(air_quality_sensor, status, 'air', sensor, frequency, port, enrollment, tsk_name)                                
+                                                                        
+        elif(sensor == 'temperature_humidity'):
+                tskAction(temperature_humidity_sensor, status, 'temp', sensor, frequency, port, enrollment, tsk_name)
+                                                                
+        elif(sensor == 'light'):
+                tskAction(light_sensor, status, 'light', sensor, frequency, port, enrollment, tsk_name)
+                                                               
+        else:
+                print('no corresponding task on client')
                 
 #----------------------------------------------------------------------------------------------------------------------
 #---------------------------------------               XML                      ---------------------------------------
 #----------------------------------------------------------------------------------------------------------------------
+#this function is used to modified the xml config file by adding new task info
 def Add_new_tsk(tsk_name, sensor, status, frequency, port, enrollment):
-        tsk = ET.SubElement(task, tsk_name)      
+        tsk = ET.SubElement(tasklist, "task")
+        tsk.set('name', tsk_name)
         tsk_sensor = ET.SubElement(tsk, "sensor")
         tsk_sensor.text = sensor
         tsk_status = ET.SubElement(tsk, "status")
@@ -217,9 +240,10 @@ def Add_new_tsk(tsk_name, sensor, status, frequency, port, enrollment):
         tsk_port.text = port
         tsk_enrollment = ET.SubElement(tsk, "enrollment")
         tsk_enrollment.text = enrollment
-        ET.dump(task)
+        ET.dump(tasklist)
         et.write('config.xml')
 
+#remove the task info from xml file
 def Remove_tsk(tsk_name):
         rm_tsk = task.find(tsk_name)
         task.remove(rm_tsk)
@@ -251,26 +275,19 @@ def on_message(client, data, msg):
                         
                         #check the output
                         print("sensor:" + sensor + " status:" + status + " frequency:" + frequency + " port:" + port + " enrollment:" + enrollment + " tsk name:" + tsk_name)
+                        #check which task to do
+                        whichTask(sensor, status, frequency, port, enrollment, tsk_name)
 
-                        #filter 
-                        if(sensor == 'air_quality'):
-                                tskAction(air_quality_sensor, status, 'air', sensor, frequency, port, enrollment, tsk_name)                                
-                                                                        
-                        elif(sensor == 'temperature_humidity'):
-                                tskAction(temperature_humidity_sensor, status, 'temp', sensor, frequency, port, enrollment, tsk_name)
-                                                                
-                        elif(sensor == 'light'):
-                                tskAction(light_sensor, status, 'light', sensor, frequency, port, enrollment, tsk_name)
-                                                               
-                        else:
-                                print('no corresponding task on client')
                 elif topic == 'device':
                         global register_flag
+                        #filter different device action
                         if str(msg.payload) == "record":
+                                #the device serial number has been stored into unregistered_device db and change the flag into true
                                 print("device has been detected")
                                 register_flag = True
                                 root.find('register_flag').text = "True"
                         elif str(msg.payload) == "unregistered":
+                                #the device serial number has been deleted from registered_device db and change the flag into False
                                 print("device has been unregistered")
                                 register_flag = False
                                 root.find('register_flag').text = "False"
@@ -295,12 +312,18 @@ client.publish('Greeting from new Raspberry Pi',  myserial,1)
 #Add_new_tsk("test","1","2","3","4","5")
 
 
+
+#restart all the interrupted task
+for task in tasklist.findall('task'):
+        if task.find('status').text == 'start':
+                whichTask(task.find('sensor').text, 'start', task.find('frequency').text, task.find('port').text, task.find('enrollment').text, task.get('name')) 
+
 #-----------------------------------------    Main loop         -----------------------------------------------
 while True:
         try:
                 et.write('config.xml')
                 time.sleep(10)
-                
+                #if flag is false then keep sending greeting message every ten second 
                 if(register_flag == False):
                         client.publish('Greeting from new Raspberry Pi',  myserial,1)
         except (IOError, TypeError) as e:
