@@ -1,5 +1,5 @@
 <root>
-	<register_flag>True</register_flag>
+	<register_flag>False</register_flag>
 	<task>
-		</task>
+		<test><sensor>air_quality</sensor><status>start</status><frequency>5</frequency><port>A0</port><enrollment>test</enrollment></test></task>
 </root>

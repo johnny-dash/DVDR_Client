@@ -107,7 +107,7 @@ def air_quality_sensor(frequence,port):
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
                         r = grovepi.analogRead(air_sensor)
-                        client.publish(pub_air, "Air_qulity_SensorA0@Raspberry Pi No.1: Sensor_value = %d" % r, 1)
+                        client.publish(pub_air, "Air_qulity_SensorA0@ %s : Sensor_value = %d" % (myserial, r), 1)
                         time.sleep(frequence)
 
                 except IOError:
@@ -122,7 +122,7 @@ def temperature_humidity_sensor(frequence,port):
                         client.connect(server, 1883, 60)
                         #sensor config and value read
                         [ temp,hum ] = grovepi.dht(dht_sensor_port,1)
-                        client.publish(pub_temp, "temperature&humidity_SensorD8@Raspberry Pi No.1: Sensor_value = %d" % temp, 1)
+                        client.publish(pub_temp, "temperature&humidity_SensorD8@ %s: Sensor_value = %d" % (myserial, temp), 1)
                         time.sleep(frequence)
                 
                 except (IOError,TypeError) as e:
@@ -136,7 +136,7 @@ def light_sensor(frequence, port):
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
                         sensor_value = grovepi.analogRead(light_sensor)
-                        client.publish(pub_temp,"Air_qulity_SensorA0@Raspberry Pi No.1: Sensor_value = %d" % sensor_value, 1)
+                        client.publish(pub_temp,"light_SensorA0@ %s : Sensor_value = %d" % (myserial, sensor_value), 1)
                         time.sleep(frequence)
 
                 except (IOError, TypeError) as e:
