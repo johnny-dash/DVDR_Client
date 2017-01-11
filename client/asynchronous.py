@@ -182,9 +182,14 @@ def tskAction(function, action, tsk_tag, set_sensor, set_fre, set_port, set_enro
                 createtsk(function,tsk_tag,set_fre , set_port)
                 #add task into xml file
                 Add_new_tsk(set_tskname, set_sensor, action, set_fre, set_port, set_enroll)
+                
         elif(action == 'stop'):
                 #delete the thread
                 stoptsk(tsk_tag)
+                
+        elif(action == 'restart'):
+                #restart stop task
+                createtsk(function,tsk_tag,set_fre , set_port)
 
         elif(action == 'delete'):
                 #delete the thread and delete task info in xml
