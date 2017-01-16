@@ -37,6 +37,7 @@ THE SOFTWARE.
 '''
 
 import time
+import datetime
 import grovepi
 import paho.mqtt.client as mqtt
 import threading
@@ -97,7 +98,7 @@ pub_register = 'new device' #publish topic for device configuration
 #---------------------------------------          Sensor function                     ---------------------------------
 #----------------------------------------------------------------------------------------------------------------------
 
-def air_quality_sensor(frequence,port):
+def air_quality_sensor(frequence,port,tsk_id):
         while True:
                 try:
                         #format port
@@ -107,14 +108,14 @@ def air_quality_sensor(frequence,port):
                         client.connect(server, 1883, 60)
                         r = grovepi.analogRead(air_sensor)
                         #generate unique topic for air quality sensor
-                        pub_air = myserial + ':Air_Quality' + port                          
-                        client.publish(pub_air, "Air_qulity_SensorA0@ %s : Sensor_value = %d" % (myserial, r), 1)
+                        pub_air = myserial + ':' + tsk_id + ':' + port                          
+                        client.publish(pub_air, "%s@%s" % (r, datetime.datetime.now()), 1)
                         time.sleep(frequence)
 
                 except IOError:
                         print ("Error") 
 
-def temperature_humidity_sensor(frequence,port):
+def temperature_humidity_sensor(frequence,port,tsk_id):
         while True:
                 try:
                         #format port
@@ -124,15 +125,15 @@ def temperature_humidity_sensor(frequence,port):
                         #sensor config and value read
                         [ temp,hum ] = grovepi.dht(dht_sensor_port,1)
                         #setup topic for temperature&humidity sensor
-                        pub_temp = myserial + ':temperature&humidity:' + port
+                        pub_temp = myserial + ':' + tsk_id +':' + port
                         #public the message
-                        client.publish(pub_temp, "temperature&humidity_SensorD8@ %s: Sensor_value = %d" % (myserial, temp), 1)
+                        client.publish(pub_temp, "%s@%s" % (temp, datetime.datetime.now()), 1)
                         time.sleep(frequence)
                 
                 except (IOError,TypeError) as e:
                         print("Error")
 
-def light_sensor(frequence, port):
+def light_sensor(frequence, port,tsk_id):
         while True:
                 try:
                         #format port
@@ -141,9 +142,9 @@ def light_sensor(frequence, port):
                         client.connect(server, 1883, 60)
                         sensor_value = grovepi.analogRead(light_sensor)
                         #setup the topic
-                        pub_light = myserial + ':light:' + port
+                        pub_light = myserial + ':' + tsk_id  + ':' + port
                         #public message
-                        client.publish(pub_light,"light_SensorA0@ %s : Sensor_value = %d" % (myserial, sensor_value), 1)
+                        client.publish(pub_light,"%s@%s" % (sensor_value, datetime.datetime.now()), 1)
                         time.sleep(frequence)
 
                 except (IOError, TypeError) as e:
@@ -153,22 +154,22 @@ def light_sensor(frequence, port):
 #----------------------------------------------------------------------------------------------------------------------
 #---------------------------------------          Process Manager                     ---------------------------------
 #----------------------------------------------------------------------------------------------------------------------
-def createtsk(target, name, tsk_freq, tsk_port):
+def createtsk(target, tsk_freq, tsk_port, tsk_id):
         #start the corresponding function as process
-        thr = multiprocessing.Process(target = target, args=(float(tsk_freq),tsk_port,))      #create the thread to run the corresponding sensor function
+        thr = multiprocessing.Process(target = target, args=(float(tsk_freq),tsk_port,tsk_id))      #create the thread to run the corresponding sensor function
         thr.start()
         #append the process into process pool
-        pool.append((name,thr))
+        pool.append((tsk_id,thr))
 
-def stoptsk(name):
+def stoptsk(tsk_id):
         #iterate to find exsisted process
         for Key, Value in pool:
-                if(Key == name):
+                if(Key == tsk_id):
                         #kill the process and remove from pool
                         Value.terminate()
                         pool.remove((Key,Value))
 
-def updatetsk(target, name, tsk_freq, tsk_port):
+def updatetsk(target, tsk_freq, tsk_port, tsk_id):
         #iterate to find exsisted process
         for Key, Value in pool:
                 if(Key == name):
@@ -177,48 +178,48 @@ def updatetsk(target, name, tsk_freq, tsk_port):
                         pool.remove((Key,Value))
                                 
         #start the corresponding function as process
-        thr = multiprocessing.Process(target = target, args=(float(tsk_freq),tsk_port,))      #create the thread to run the corresponding sensor function
+        thr = multiprocessing.Process(target = target, args=(float(tsk_freq),tsk_port,tsk_id))      #create the thread to run the corresponding sensor function
         thr.start()
         #append the process into process pool
-        pool.append((name,thr))
+        pool.append((tsk_id,thr))
 
 #action filter to take different actions
-def tskAction(function, action, tsk_tag, set_sensor, set_fre, set_port, set_enroll, set_tskname ):
+def tskAction(function, action, set_sensor, set_fre, set_port, set_enroll, set_tskid ):
         if(action == 'start'):
                 #create thread
-                createtsk(function,tsk_tag,set_fre , set_port)
+                createtsk(function, set_fre, set_port, set_tskid)
                 #add task into xml file
-                Add_new_tsk(set_tskname, set_sensor, action, set_fre, set_port, set_enroll)
+                Add_new_tsk(set_tskid, set_sensor, action, set_fre, set_port, set_enroll)
                 
         elif(action == 'stop'):
                 #delete the thread
-                stoptsk(tsk_tag)
+                stoptsk(set_tskid)
                 
         elif(action == 'restart'):
                 #restart stop task
-                createtsk(function,tsk_tag,set_fre , set_port)
+                createtsk(function, set_fre , set_port, set_tskid)
 
         elif(action == 'delete'):
                 #delete the thread and delete task info in xml
-                stoptsk(tsk_tag)
-                Remove_tsk(set_tskname)
+                stoptsk(set_tskid)
+                Remove_tsk(set_tskid)
                 
         elif(action == 'update'):
                 #update the thread and update the xml config file
-                updatetsk(function,tsk_tag, set_fre, set_port)
-                Remove_tsk(set_tskname)
-                Add_new_tsk(set_tskname, set_sensor, action, set_fre, set_port, set_enroll)
+                updatetsk(function, set_fre, set_port, set_tskid)
+                Remove_tsk(set_tskid)
+                Add_new_tsk(set_tskid, set_sensor, action, set_fre, set_port, set_enroll)
 
 #filter different sensor
-def whichTask(sensor, status, frequency, port, enrollment, tsk_name):
+def whichTask(sensor, status, frequency, port, enrollment, tsk_id):
         if(sensor == 'air_quality'):
-                tskAction(air_quality_sensor, status, 'air', sensor, frequency, port, enrollment, tsk_name)                                
+                tskAction(air_quality_sensor, status, sensor, frequency, port, enrollment, tsk_id)                                
                                                                         
         elif(sensor == 'temperature_humidity'):
-                tskAction(temperature_humidity_sensor, status, 'temp', sensor, frequency, port, enrollment, tsk_name)
+                tskAction(temperature_humidity_sensor, status, sensor, frequency, port, enrollment, tsk_id)
                                                                 
         elif(sensor == 'light'):
-                tskAction(light_sensor, status, 'light', sensor, frequency, port, enrollment, tsk_name)
+                tskAction(light_sensor, status, sensor, frequency, port, enrollment, tsk_id)
                                                                
         else:
                 print('no corresponding task on client')
@@ -271,12 +272,12 @@ def on_message(client, data, msg):
                         frequency = info[2];
                         port = info[3]
                         enrollment = info[4]
-                        tsk_name = info[5]
+                        tsk_id = info[5]
                         
                         #check the output
-                        print("sensor:" + sensor + " status:" + status + " frequency:" + frequency + " port:" + port + " enrollment:" + enrollment + " tsk name:" + tsk_name)
+                        print("sensor:" + sensor + " status:" + status + " frequency:" + frequency + " port:" + port + " enrollment:" + enrollment + " tsk id:" + tsk_id)
                         #check which task to do
-                        whichTask(sensor, status, frequency, port, enrollment, tsk_name)
+                        whichTask(sensor, status, frequency, port, enrollment, tsk_id)
 
                 elif topic == 'device':
                         global register_flag
@@ -316,7 +317,8 @@ client.publish('Greeting from new Raspberry Pi',  myserial,1)
 #restart all the interrupted task
 for task in tasklist.findall('task'):
         if task.find('status').text == 'start':
-                whichTask(task.find('sensor').text, 'start', task.find('frequency').text, task.find('port').text, task.find('enrollment').text, task.get('name')) 
+                whichTask(task.find('sensor').text, 'restart', task.find('frequency').text, task.find('port').text, task.find('enrollment').text, task.get('name')) 
+
 
 #-----------------------------------------    Main loop         -----------------------------------------------
 while True:
