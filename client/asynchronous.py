@@ -194,21 +194,33 @@ def tskAction(function, action, set_sensor, set_fre, set_port, set_enroll, set_t
         elif(action == 'stop'):
                 #delete the thread
                 stoptsk(set_tskid)
+                Change_state(set_tskid,'stop')
                 
         elif(action == 'restart'):
                 #restart stop task
-                createtsk(function, set_fre , set_port, set_tskid)
+                for task in tasklist:
+                        if task.get('name') == set_tskid:
+                                createtsk(function, set_fre , set_port, set_tskid)
 
         elif(action == 'delete'):
                 #delete the thread and delete task info in xml
-                stoptsk(set_tskid)
+                for task in tasklist:
+                        if task.get('name') == set_tskid:
+                                if task.find('status').text != 'stop':
+                                        print("hello world")
+                                        stoptsk(set_tskid)
                 Remove_tsk(set_tskid)
                 
         elif(action == 'update'):
                 #update the thread and update the xml config file
-                updatetsk(function, set_fre, set_port, set_tskid)
-                Remove_tsk(set_tskid)
-                Add_new_tsk(set_tskid, set_sensor, action, set_fre, set_port, set_enroll)
+                for task in tasklist:
+                        if task.get('name') == set_tskid:
+                                if task.find('status').text != 'stop':
+                                        updatetsk(function, set_fre, set_port, set_tskid)
+                                        Remove_tsk(set_tskid)
+                                        Add_new_tsk(set_tskid, set_sensor, action, set_fre, set_port, set_enroll)
+                                else:
+                                        Change_tsk(set_tskid, set_fre, set_port)
 
 #filter different sensor
 def whichTask(sensor, status, frequency, port, enrollment, tsk_id):
@@ -246,9 +258,25 @@ def Add_new_tsk(tsk_name, sensor, status, frequency, port, enrollment):
 
 #remove the task info from xml file
 def Remove_tsk(tsk_name):
-        rm_tsk = task.find(tsk_name)
-        task.remove(rm_tsk)
+        for task in tasklist:
+                if task.get('name') == tsk_name:
+                        tasklist.remove(task)
         et.write('config.xml')
+
+#change the state of task
+def Change_state(tsk_name, status):
+        for task in tasklist:
+                if task.get('name') == tsk_name:
+                        task.find('status').text = status
+                        et.write('config.xml')
+
+#change parameter of task
+def Change_tsk(tsk_name, frequency, port):
+        for task in tasklist:
+                if task.get('name') == tsk_name:
+                        task.find('frequency').text = frequency
+                        task.find('port').text = port
+                        et.write('config.xml')
         
 #----------------------------------------------------------------------------------------------------------------------
 #---------------------------------------               MQTT                     ---------------------------------------
@@ -310,16 +338,15 @@ client.connect(server, 1883, 60)
 client.loop_start()
 client.publish('Greeting from new Raspberry Pi',  myserial,1)
 
-#Add_new_tsk("test","1","2","3","4","5")
-
 
 
 #restart all the interrupted task
-for task in tasklist.findall('task'):
+for task in tasklist:
         if task.find('status').text == 'start':
                 whichTask(task.find('sensor').text, 'restart', task.find('frequency').text, task.find('port').text, task.find('enrollment').text, task.get('name')) 
 
 
+Remove_tsk("2d74A12017019")
 #-----------------------------------------    Main loop         -----------------------------------------------
 while True:
         try:
