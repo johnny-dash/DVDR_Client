@@ -46,7 +46,8 @@ import xml.etree.ElementTree as ET
 
 #get device serial number
 from GrovepiSerial import getserial
-
+from NetworkChecking import internet_on
+from SerialDisplay import serialDisplay
 
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -60,9 +61,8 @@ pool = []
 #air_sensor = 0                  # Connect the Grove Air Sensor to analog port A0
 #dht_sensor_port = 8		 # Connect the DHt sensor to port 8
 
-
-#Device Serial Number
-cpuserial = "0000000000000000"
+#Display serial number on LCD
+serialDisplay()
 
 #set up serial number
 myserial = getserial()
@@ -327,7 +327,13 @@ def on_message(client, data, msg):
                         print("Receive message '" + str(msg.payload) + "' on topic '" + msg.topic + "' with QoS " + str(msg.qos))
 
 
-
+while True:
+        if internet_on():
+                print('Wifi has been connected')
+                break
+        else:
+                print('Wifi has not been connected')
+        time.sleep(10)
  
 
 client = mqtt.Client()
@@ -346,7 +352,7 @@ for task in tasklist:
                 whichTask(task.find('sensor').text, 'restart', task.find('frequency').text, task.find('port').text, task.find('enrollment').text, task.get('name')) 
 
 
-Remove_tsk("2d74A12017019")
+
 #-----------------------------------------    Main loop         -----------------------------------------------
 while True:
         try:

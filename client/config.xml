@@ -1,5 +1,5 @@
 <root>
 	<register_flag>True</register_flag>
 	<tasklist>
-	</tasklist>
+	<task name="ab3bA12017020"><sensor>light</sensor><status>start</status><frequency>5</frequency><port>A1</port><enrollment>12345678</enrollment></task></tasklist>
 </root>
