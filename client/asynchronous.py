@@ -201,13 +201,13 @@ def tskAction(function, action, set_sensor, set_fre, set_port, set_enroll, set_t
                 for task in tasklist:
                         if task.get('name') == set_tskid:
                                 createtsk(function, set_fre , set_port, set_tskid)
+                Change_state(set_tskid,'start')
 
         elif(action == 'delete'):
                 #delete the thread and delete task info in xml
                 for task in tasklist:
                         if task.get('name') == set_tskid:
                                 if task.find('status').text != 'stop':
-                                        print("hello world")
                                         stoptsk(set_tskid)
                 Remove_tsk(set_tskid)
                 
@@ -333,7 +333,7 @@ while True:
                 break
         else:
                 print('Wifi has not been connected')
-        time.sleep(10)
+        time.sleep(5)
  
 
 client = mqtt.Client()
