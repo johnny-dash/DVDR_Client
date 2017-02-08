@@ -213,13 +213,16 @@ def tskAction(function, action, set_sensor, set_fre, set_port, set_enroll, set_t
                 
         elif(action == 'update'):
                 #update the thread and update the xml config file
+                print('frequency has been updated')
                 for task in tasklist:
                         if task.get('name') == set_tskid:
                                 if task.find('status').text != 'stop':
+                                        print('task start and update')
                                         updatetsk(function, set_fre, set_port, set_tskid)
                                         Remove_tsk(set_tskid)
                                         Add_new_tsk(set_tskid, set_sensor, action, set_fre, set_port, set_enroll)
                                 else:
+                                        print('task stop and update')
                                         Change_tsk(set_tskid, set_fre, set_port)
 
 #filter different sensor
