@@ -172,7 +172,7 @@ def stoptsk(tsk_id):
 def updatetsk(target, tsk_freq, tsk_port, tsk_id):
         #iterate to find exsisted process
         for Key, Value in pool:
-                if(Key == name):
+                if(Key == tsk_id):
                         #kill the process and remove from pool
                         Value.terminate()
                         pool.remove((Key,Value))
