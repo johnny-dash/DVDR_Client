@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# 
+#This serial is used to display the serial number 
 
 from grove_rgb_lcd import *
 from GrovepiSerial import getserial

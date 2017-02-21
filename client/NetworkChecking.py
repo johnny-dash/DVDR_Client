@@ -1,6 +1,7 @@
 import urllib2
 import time
 
+#this script is used to check if the network is ready
 def internet_on():
 	while True:
 		try:

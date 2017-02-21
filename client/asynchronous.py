@@ -46,7 +46,9 @@ import xml.etree.ElementTree as ET
 
 #get device serial number
 from GrovepiSerial import getserial
+#check if internet is working 
 from NetworkChecking import internet_on
+#display serial number
 from SerialDisplay import serialDisplay
 
 
@@ -107,7 +109,7 @@ def air_quality_sensor(frequence,port,tsk_id):
                         client = mqtt.Client()
                         client.connect(server, 1883, 60)
                         r = grovepi.analogRead(air_sensor)
-                        #generate unique topic for air quality sensor
+                        #generate unique topic for air quality sensor 
                         pub_air = myserial + ':' + tsk_id + ':' + port                          
                         client.publish(pub_air, "%s@%s" % (r, datetime.datetime.now()), 1)
                         time.sleep(frequence)
@@ -115,7 +117,7 @@ def air_quality_sensor(frequence,port,tsk_id):
                 except IOError:
                         print ("Error") 
 
-def temperature_humidity_sensor(frequence,port,tsk_id):
+def temperature_humidity_sensor(frequence,port,tsk_id): 
         while True:
                 try:
                         #format port
